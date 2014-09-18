@@ -13,17 +13,12 @@ This project fulfill different aspects of PHP and MYSQL database integration in 
 
       getPrimeryKey(): return primery key name or false if doesnt exists.
       
-      
       createTableIfNotExists(): returns query to create table into database or false if no records found
-      
       
       valueAsJsonString(): values of records as json string
       
-      
       searchAndUpdateValues($search): returns true if search value in $search array found in table followed retriving rest value
-      
       and update in class or false if records not found according to value in $search value.
-      
       
       insertAndUpdateValues(): insert values as new record and update new values in record like primery key value and dates etc.
       
