@@ -22,7 +22,8 @@ class maindb_con
         $this->dbname = "**********";       // database name that would be initially selected after sucessful connection
         if(!mysql_connect($this->hostname, $this->username, $this->password,$this->dbname))
         {
-        	echo'Error:: 1001, please change credintial properties';               // special error code to represent connection error
+        	echo'Error:: 1001 Couldnot connect to database. Please update hostname, username and password';      
+        			// special error code to represent connection error
         	exit();
         }
     }
@@ -43,5 +44,9 @@ class maindb_con
     {
     	return $this->dbname;
     }
+    public function __destruct()
+	{
+		mysql_close($this->con);
+	}
 } 
 ?>
