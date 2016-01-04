@@ -1,11 +1,11 @@
 <?php
 include_once("scDBCon.php"); // DB connection File
+include_once("scInit.php");
 
 
 // These three files are extenction on program to add UI Layer and will be implemented soon. 
 // Once UI layer is completed, will be uploaded here
 
-//include_once("scInit.php");
 //include_once("scHTML.php");
 //include_once("scHTMLTable.php");
 
