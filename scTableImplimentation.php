@@ -1,141 +1,178 @@
-<?php
 include_once("scTable.php");
+include_once("scTables.php");
+include_once("scInit.php");
 
-function ifRequestExist($key,$default) // function to check if $_REQUEST['$key'] and return value or default if key not available
-{
-	if(isset($_REQUEST[$key]))
-		return $_REQUEST[$key];
-	return $default;
-}
+$tables	=	new tables();
 
-// here we implement table class to structure a new table 'location'.
 class location extends table
-{ 
+{
 	public function __construct()
 	{
-		// call parent constructor to init table name
 		parent::__construct("location");
-		// add fields and default values
-		$this->addReord("location_id","",false);
-		$this->addReord("longitude",ifRequestExist("longitude",0.0),true);
-		$this->addReord("latitude",ifRequestExist("latitude",0.0),true);
-		$this->addReord("altitude",ifRequestExist("altitude",0.0),true);	
-		// add field properties
-		$this->addAlterIndex("location_id","bigint(20)");
-		$this->addAlterIndex("location_id","NOT NULL");
-		$this->addAlterIndex("location_id","AUTO_INCREMENT");
 		
-		$this->addAlterIndex("longitude","double");
-		$this->addAlterIndex("longitude","NOT NULL");
+		$this->addRecordWithOptions("location_id","",false,false);
+		$this->addRecordWithOptions("longitude",requestDefault("longitude",0.0),true,true);
+		$this->addRecordWithOptions("latitude",requestDefault("latitude",0.0),true,true);
+		$this->addRecordWithOptions("altitude",requestDefault("altitude",0.0),true,true);
 		
-		$this->addAlterIndex("latitude","double");
-		$this->addAlterIndex("latitude","NOT NULL");
+		$this->addPrimeryKey("location_id");
+		$this->addNotNullKey("longitude",datasets::double);
+		$this->addNotNullKey("latitude",datasets::double);
+		$this->addNotNullKey("altitude",datasets::double);
 		
-		$this->addAlterIndex("altitude","double");
-		$this->addAlterIndex("altitude","NOT NULL");
-		
-		$this->addAlterIndex("location_id","PRIMARY KEY");
-		$this->addAlterIndex("TABLE_PROPERTIES","ENGINE=InnoDB DEFAULT CHARSET=latin1 AUTO_INCREMENT=1000000000001");
+		$this->insertValues();
 	}
-	public function insertAndUpdateValues() // this method overrides parent method 
+	
+	public function insertValues()
 	{
-		$search['longitude']=ifRequestExist("longitude",0.0);
-		$search['latitude']=ifRequestExist("latitude",0.0);
-		//$search['altitude']=ifRequestExist("altitude",0.0);
-		if(!parent::searchAndUpdateValues($search)) // check if same record exists in database then retrive values 
-			return parent::insertAndUpdateValues();   // if same record not found in database then only add new record
+		$search['longitude']=requestDefault("longitude",0.0);
+		$search['latitude']=requestDefault("latitude",0.0);
+		$search['altitude']=requestDefault("altitude",0.0);
+		$this->runQuery($this->createTable());
+		if(!parent::search($search))
+			return parent::insertValues();
 		return true;
 	}
 }
-//echo new location();
 
-
-
-
-// here we implement table class to structure a new table 'name'
-class name extends table
-{ 
-	var $loc;         // another table location which determine location of user from location table and location_id to
-	                  // be associate with name table as foreign key
+class visitor_log extends table
+{
+	private $loc;
 	public function __construct()
 	{
-		// call parent constructor to init table name
-		parent::__construct("name");
-		// add fields and default values
+		parent::__construct("visitor_log");
+		
 		$this->loc= new location();
+		//$this->loc->insertValues();
+		$ip=NULL;
+		if (!empty($_SERVER['HTTP_CLIENT_IP'])) 
+			$ip = $_SERVER['HTTP_CLIENT_IP'];
+		elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) 
+			$ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+		else 
+			$ip = $_SERVER['REMOTE_ADDR'];
+			
+			
+		$this->addRecordWithOptions("visitor_log_id",requestDefault("visitor_lig_id",""), true, false);
+		$this->addRecordWithOptions("location_id",$this->loc->getFieldValue("location_id"),false,true);
+		$this->addRecordWithOptions("timestamp",$_SERVER['REQUEST_TIME'],false,true);
+		$this->addRecordWithOptions("ip",$ip,false,true);
+		$this->addRecordWithOptions("user_detect",$_SERVER['HTTP_USER_AGENT'],false,true);
 		
-		$this->addReord("name_id","",false);
-		$this->addReord("userid",ifRequestExist("userid",""),true);
-		$this->addReord("title",ifRequestExist("title",""),true);
-		$this->addReord("fname",ifRequestExist("fname",""),true);
-		$this->addReord("mname",ifRequestExist("mname",""),true);
-		$this->addReord("lname",ifRequestExist("lname",""),true);
-		$this->addReord("state",1,true);	                  // state of record whether its is private, public, current or deleted
-		$this->addReord("datecreated",$_SERVER['REQUEST_TIME'],false);
-		$this->addReord("datemodified",$_SERVER['REQUEST_TIME'],false);
+		$this->addPrimeryKey("visitor_log_id");
+		$this->addForeighKey("location_id","location");
+		$this->addNotNullKey("timestamp",datasets::int_12);
+		$this->addNotNullKey("ip",datasets::varchar_50);
+		$this->addNotNullKey("user_detect",datasets::varchar_250);
+		
+		$this->insertValues();	
+	}
 	
-	
-		// add field properties
-		$this->addAlterIndex("name_id","bigint(20)");
-		$this->addAlterIndex("name_id","NOT NULL");
-		$this->addAlterIndex("name_id","AUTO_INCREMENT");
-		
-		$this->addAlterIndex("userid","bigint(20)");
-		$this->addAlterIndex("userid","NOT NULL");
-		
-		$this->addAlterIndex("title","varchar(20)");
-		$this->addAlterIndex("title","NOT NULL");
-		
-		$this->addAlterIndex("fname","varchar(50)");
-		$this->addAlterIndex("fname","NOT NULL");
-		
-		$this->addAlterIndex("mname","varchar(50)");
-		$this->addAlterIndex("mname","NOT NULL");
-		
-		$this->addAlterIndex("lname","varchar(50)");
-		$this->addAlterIndex("lname","NOT NULL");
-		
-		
-		$this->addAlterIndex("state","int(12)");
-		$this->addAlterIndex("state","NOT NULL");
-		
-		$this->addAlterIndex("datecreated","int(12)");
-		$this->addAlterIndex("datecreated","NOT NULL");
-		
-		$this->addAlterIndex("datemodified","int(12)");
-		$this->addAlterIndex("datemodified","NOT NULL");
-		
-		$this->addAlterIndex("name_id","PRIMARY KEY");
-		$this->addAlterIndex("TABLE_PROPERTIES","ENGINE=InnoDB DEFAULT CHARSET=latin1 AUTO_INCREMENT=1000000000001");
+	public function insertValues()
+	{
+		$ip=NULL;
+		if (!empty($_SERVER['HTTP_CLIENT_IP'])) 
+			$ip = $_SERVER['HTTP_CLIENT_IP'];
+		elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) 
+			$ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+		else 
+			$ip = $_SERVER['REMOTE_ADDR'];
+			
+		$search['ip']=$ip;
+		$search['user_detect']=$_SERVER['HTTP_USER_AGENT'];
+		$this->runQuery($this->createTable());
+		if(!parent::search($search))
+			return parent::insertValues();
+		return true;
 	}
 }
-//echo new name();  // test to see how the structure of table name would look like
 
-
-
-// lets populate our design into database
-
-function populateTablesIntoDatabase()
+class useridinf extends table
 {
-	$location	=	new 	location();
-	$name		= 	new		name();
+	public $loc;
+	public $visitor_log;
 	
-	$location->runQuery($location->createTableIfNotExists());
-	$name->runQuery($name->createTableIfNotExists());
 	
-	// lets see the result 
-	// comment following 2 line if you dont want to see lengthy reports of tables
+	public function __construct()
+	{
+		parent::__construct("useridinf");
+		$this->loc= new location();
+		$this->visitor_log = new visitor_log();
+		$this->addRecordWithOptions("userid","",true,false);
+		$this->addRecordWithOptions("password",requestDefault("password",md5("P@55mord")),true,true);
+		$this->addRecordWithOptions("gender","gender",false,true);
+		$this->addRecordWithOptions("location_id",$this->loc->getFieldValue("location_id"),false,false);
+		$this->addRecordWithOptions("visitor_log_id",$this->visitor_log->getFieldValue("visitor_log_id"),false,false);
+		$this->addRecordWithOptions("state",1,false,false);
+		$this->addRecordWithOptions("role","Guest",false,true);
+		$this->addRecordWithOptions("date_created",getTimestamp(),false,true);
+		$this->addRecordWithOptions("date_modified",getTimestamp(),false,true);
+		
+		$this->addPrimeryKey("userid");
+		$this->addNotNullKey("password",datasets::varchar_250);
+		$this->addNotNullKey("gender",datasets::varchar_20);
+		$this->addForeighKey("location_id","location");
+		$this->addForeighKey("visitor_log_id","visitor_log");
+		$this->addNotNullKey("state",datasets::int_12);
+		$this->addNotNullKey("role",datasets::varchar_20);
+		$this->addNotNullKey("date_created",datasets::int_12);
+		$this->addNotNullKey("date_modified",datasets::int_12);
+	}
+}
+
+
+class usernameinf extends table
+{
+	private $loc;
+	private $visitor_log;
 	
-	echo $location;
-	echo $name;
 	
+	public function __construct()
+	{
+		parent::__construct("usernameinf");
+		$this->loc= new location();
+		$this->visitor_log = new visitor_log();
+		
+		$this->addRecordWithOptions("username_id","",false,false);
+		$this->addRecordWithOptions("userid",requestDefault("userid",""),false,false);
+		$this->addRecordWithOptions("username",requestDefault("username","username"),true,true);
+		$this->addRecordWithOptions("location_id",$this->loc->getFieldValue("location_id"),false,false);
+		$this->addRecordWithOptions("visitor_log_id",$this->visitor_log->getFieldValue("visitor_log_id"),false,false);
+		$this->addRecordWithOptions("state",1,false,false);
+		$this->addRecordWithOptions("date_created",getTimestamp(),false,true);
+		$this->addRecordWithOptions("date_modified",getTimestamp(),false,false);
+		
+		$this->addPrimeryKey("username_id");
+		$this->addForeighKey("userid","useridinf");
+		$this->addUniqueKey("username",datasets::varchar_250);
+		$this->addForeighKey("location_id","location");
+		$this->addForeighKey("visitor_log_id","visitor_log");
+		$this->addNotNullKey("state",datasets::int_12);
+		$this->addNotNullKey("date_created",datasets::int_12);
+		$this->addNotNullKey("date_modified",datasets::int_12);
+	}
 	
 }
 
-// lets run the code 
+$tables	=	new tables();
 
-populateTablesIntoDatabase();
+$location		=	new location();
+$visitor_log		=	new visitor_log();
+$useridinf		=	new useridinf();
+
+$tables->addTable($location);
+$tables->addTable($visitor_log);
+$tables->addTable($useridinf);
 
 
-?>
+//echo $tables;  // to print all table details.
+/*
+
+// just un-comment one to perform either populate tables or to drop
+//if($tables->populateTables()) // to populate tables into database
+//if($tables->dropTables()) 	// to drop all tables into database
+	echo'sucess';
+else
+	echo'failed';
+*/
 
