@@ -1,174 +1,182 @@
 <?php
-include_once("scConfigMain.php");
+include_once("scDBCon.php"); // DB connection File
+
+
+// These three files are extenction on program to add UI Layer and will be implemented soon. 
+// Once UI layer is completed, will be uploaded here
+
+//include_once("scInit.php");
+//include_once("scHTML.php");
+//include_once("scHTMLTable.php");
+
+
 define("NEW_LINE", "</BR>");
+define("TAB","&nbsp;&nbsp;&nbsp;&nbsp;");
 
 class table
 {
 	protected $name;			// name of the table
 	protected $records;			// fields in table
-	protected $indexes;			// fielst in the table with references
+	protected $indexes;			// fields in the table with references
 	protected $required;		// fields that the value are scanned in the form, required by 
 								// default to insert records in the table.
-	protected $postIntoForm;		// Field that the values are display to fill by user
+	protected $postIntoForm;	// Field that the values are display to fill by user
 	protected $alterIndex;		// Special fields defination. eg. PRIMARY, UNIQUE, etc
 	protected $con;				// connection class to database
 	protected $garbage;			// error during the class emplimentation. 
 	
-	// constructor to define table bame and register destructor when life of abject is expire
+	// constructor to define table name 
 	public function __construct($tableName)
 	{
-		register_shutdown_function(array($this,'__destruct'));
 		$this->setName($tableName);
-	}
-	public function __destruct()
-	{
-		unset($this->name);
-		unset($this->records);
-		unset($this->indexes);
-		unset($this->required);
-		unset($this->postIntoForm);
-		unset($this->alterIndex);
-		unset($this->con);
-		unset($this->garbage);
+		$this->records			=	array();
+		$this->indexes			= array();
+		$this->required			= array();
+		$this->postIntoForm	=	array();
+		$this->alterIndex		=	array();
+		$dbHandler 					= scDBCon::getInstance();
+		$this->con					=	$dbHandler->getConnection();
+		$this->garbage			=	array(); 
+		$this->addTableProperties();
 	}
 	
-	public function getFieldValueByName($field)
-	{
-		if($this->isFieldExist($field))
-			return $this->records[$field];
-		$this->addGarbage("Error: Record not found in function getFieldValueByName() for:".$field);
-		return false;
-	}
 	// check if field in record is already exist
 	private function isFieldExist($field)
 	{
-		return isset($this->records[$field]);
+		return array_key_exists($field,$this->records)? true: false;
 	}
-	
 	
 	/*/ add new field in record list
-		where, field is name of field
-		$value is default value,
-	
-	/
-	public function addReord($field,$value,$isRequired,$isPostIntoForm)
-	{
-		if(!$this->isFieldExist($field))
-		{
-			$this->records[$field]=$value;
-			if($isRequired)
-				$this->required[]=$field;
-			if($isPostIntoForm)
-				$this->postIntoForm[]=$field;
-			return true;
-		}
-		$this->addGarbage("Error: Duplicate record found in function addRecord()");
-		return false;
-	}
+		where, field is name of field,
+		default is default value, isRequired 
+		is if it is required during 
+		form scan and is postIntoForm
+		is whether to post value into 
+		form
 	*/
-	public function addReord($field,$value,$isRequired)
+	public function addRecordWithOptions($fieldName,$defaultValue,$isRequiredWhileScanningForm,$isPostIntoFormToDisplayToUser)
 	{
-		//return $this->addReord($field,$value,$isRequired,$isRequired);
-		if(!$this->isFieldExist($field))
+		if(!$this->isFieldExist($fieldName))
 		{
-			$this->records[$field]=$value;
-			if($isRequired)
-				$this->required[]=$field;
-			if($isPostIntoForm)
-				$this->postIntoForm[]=$field;
+			$this->records[$fieldName]=$defaultValue;
+			if($isRequiredWhileScanningForm)
+				$this->required[]=$fieldName;
+			if($isPostIntoFormToDisplayToUser)
+				$this->postIntoForm[]=$fieldName;
 			return true;
 		}
-		$this->addGarbage("Error: Duplicate record found in function addRecord()");
+		$this->addGarbage("Error!: Duplicate record found in function addRecord() for field: ".$field);
 		return false;
 	}
 	
-	// remove existing field from record list
-	public function removeRecordByField($fild)
+	// add field and record value into  record list.
+	public function addRecord($field,$value)
 	{
-		if($this->isFieldExist($fild))
-		{
-			unset($this->records[$fild]);
-			return true;
-		}
-		$this->addGarbage("Error: Unidentified field tried to remove in function removeRecordByField()");
+		return $this->addRecordWithOptions($field,$value,false,false);
+	}
+	
+	// get field value by field name
+	public function getFieldValue($field)
+	{
+		if($this->isFieldExist($field))
+			return $this->records[$field];
+		$this->addGarbage("Error: Record not found in function getFieldValue($field) for:".$field);
 		return false;
 	}
 	
-	// remove existing field from record list by value
-	protected function removeRecordByValue($vlaue)
-	{
-		$this->records=array_diff($this->records, array($vlaue));
-	}
-	
-	// Update filed in record list
-	public function updateRecordByField($field,$newValue)
+	// Update filed value in record list
+	public function updateRecord($field,$newValue)
 	{
 		if($this->isFieldExist($field))
 		{
 			$this->records[$field]=$newValue;
 			return true;
 		}
-		$this->addGarbage("Error: Unidentified field:$field tried to update to:$newValue in function updateRecordByField()");
+		$this->addGarbage("Error: Unidentified field:$field tried to update to:$newValue in function updateRecord()");
 		return false;
-	}
-	protected function updateRecordByVlaue($oldValue,$newValue)
-	{
-		$this->records[array_search($oldValue,$this->records)]=$newValue;
-	}
-	protected function displayRecords()
-	{
-		print_r($this->records);
 	}
 	
 	//for alter index
+	
 	public function addAlterIndex($field,$value)
 	{
-		if($this->isFieldExist($field)||$field=="TABLE_PROPERTIES")
+		//if($this->isFieldExist($field)||$field=="TABLE_PROPERTIES")
 		{
 			$this->alterIndex[$field][]=$value;
 			return true;
 		}
-		$this->addGarbage("Error: Properties added to Unidentified field: $field with properties: $value  function addAlterIndex()");
+		$this->addGarbage("Error: Properties added to Unidentified field: \"$field\" with properties: \"$value\" function addAlterIndex()");
 		return false;
 	}
-	public function removeAlterIndexByField($fild)
+	public function removeAlterIndexByField($field)
 	{
-		unset($this->alterIndex[$fild]);
+		unset($this->alterIndex[$field]);
 	}
-	public function removeAlterIndexByValue($vlaue)
+	//add primery key
+	public function addPrimeryKey($field)
 	{
-		$this->alterIndex=array_diff($this->alterIndex, array($vlaue));
+		$this->addNotNullKey($field,datasets::bigint_20);
+		$this->addAlterIndex($field,datasets::auto_increment);
+		$this->addAlterIndex($field,datasets::primery_key);
 	}
-	public function updateAlterIndexByField($field,$newValue)
+	public function addUniqueKey($field,$value)
 	{
-		$this->alterIndex[$field]=$newValue;
+		$this->addNotNullKey($field,$value);
+		$this->addAlterIndex($field,datasets::unique_key);
 	}
-	public function updateAlterIndexByVlaue($oldValue,$newValue)
+	public function addNotNullKey($key,$value)
 	{
-		$this->alterIndex[array_search($oldValue,$this->alterIndex)]=$newValue;
+		$return =true;
+		if(!$this->addkey($key,$value))
+			$return=false;
+		if(!$this->addAlterIndex($key,datasets::not_null))
+			$return=false;
+		return $return;
 	}
-	
+	public function addkey($key,$value)
+	{
+		return $this->addAlterIndex($key,$value);
+	}
+	public function addTableProperties()
+	{
+		return $this->addkey("TABLE_PROPERTIES","ENGINE=InnoDB DEFAULT CHARSET=latin1 AUTO_INCREMENT=1000000000001");
+	}
 	// add foreign constraint 
 	public function addForeighKey($key,$foreignTable)
 	{
-		if($this->isFieldExist($key))
+		//if($this->isFieldExist($key))
 		{
+			$this->addNotNullKey($key,datasets::bigint_20);
 			$this->indexes[$key]=$foreignTable;
 			return true;
 		}
-		else
-			$this->addGarbage("Foreign key constraint on undefined field $key on addForeignKey()");
-		return false;
+		//else
+			//$this->addGarbage("Error!: Foreign key constraint on undefined field $key on addForeignKey()");
+		//return false;
+	}
+	public function getReferences()
+	{
+		return $this->indexes;
 	}
 	
 	public function runQuery($query)
 	{
-		$dbcon=new maindb_con();
-   		$con=$dbcon->get_con();
+		$result=NULL;
+		$return =true;
+		try
+		{
 		//echo "query on runQuery(): ".$query;
-		if(mysql_query($query,$con)) //or die("couldnt run mysql_query on runQuery for ".$query)
-			return true;
-		return false;
+			$result=$this->con->exec($query); 
+			return $result; 
+		}
+		catch (Exception $e) 
+		{
+			$this->addGarbage($e->getCode().": ".$e->getMessage());
+			echo $this;
+			
+			$return=false;
+		}
+		return $return;
 	}
 	public function getPrimeryKey()
 	{
@@ -179,14 +187,12 @@ class table
 					foreach($bValue as $fieldProperties)
 						if($fieldProperties=="PRIMARY KEY")
 							$primeryKey=$aKey;
-						//else if($fieldProperties=="UNIQUE KEY")
-							//$uniqueKey=$aKey;
 		if(!$primeryKey)
 			return false;
 		else
 			return $primeryKey;
 	}
-	public function createTableIfNotExists()
+	public function createTable()
 	{
 		$query="CREATE TABLE IF NOT EXISTS ".$this->getName()." ( ";
 		$primeryKey=NULL;
@@ -230,19 +236,12 @@ class table
 			if(count($this->indexes>0))
 			{
 				foreach($this->indexes as $fKey => $fTable)
-				{
-					
-					$query.= " , ";
-					//$query.= "CONSTRAINT fk_".$this->getName()."_".$fTable."_".$fKey. " FOREIGN KEY(".$fKey.") REFERENCES ".$fTable."(".$fKey.") ON DELETE RESTRICT ON UPDATE RESTRICT";
-					
-					$query.= " FOREIGN KEY (".$fKey.") REFERENCES ".$fTable."(".$fKey.") ON DELETE RESTRICT ON UPDATE RESTRICT";
-				}
+					$query.= ", FOREIGN KEY (".$fKey.") REFERENCES ".$fTable."(".$fKey.") ON DELETE RESTRICT ON UPDATE RESTRICT";
 			}
 			$query.=" ) ";
 			if($tableProperties)
 				$query.= " ".$tableProperties;
 			$query.=" ; ";
-			
 			return $query;
 		}
 		else
@@ -256,100 +255,97 @@ class table
 	public function turncateTable()
 	{
 		//SET FOREIGN_KEY_CHECKS = 0;
-		$return="TRUNCATE TABLE ".$this->getName();
-		$return.=";";
-		
-		//SET FOREIGN_KEY_CHECKS = 1
-		return $return;
+		return "TRUNCATE TABLE ".$this->getName().";";
+		//SET FOREIGN_KEY_CHECKS = 1;
 	}
 	
 	public function dropTable()
 	{
-		$return="DROP TABLE ".$this->getName();
-		$return.=";";
-		return $return;
+		return "DROP TABLE ".$this->getName().";";
 	}
 	
 	public function valueAsJsonString()
 	{
-		$json='{"table":"'.$this->getName().'"';
+		$json='{ "table":"'.$this->getName().'"';
 		foreach($this->records as $key => $value)
-			$json.=',"'.$key.'":"'.$value.'"';
-		$json.='}';
+			$json.=', "'.$key.'":"'.$value.'"';
+		$json.=' }';
 		return $json;
 		
 	}
-	
-	public function searchAndReturnRecordsAsArray( $table,$search)
+
+	public function returnResultsAsArray( $table,$search)
 	{
 		$count=0;
 	 	$return= array();
-		$query="SELECT * FROM ".$table->getName()." WHERE ";
-		foreach($search as $aKey => $aValue)
+		$query="SELECT * FROM ".$table->getName();
+		if(count($search)>0)
 		{
-			if($count>0)
-				$query.= " AND ";
-			$query.= $aKey." = '".$aValue."'";
-			$count++;
-		}
-		//$query.=" ORDER BY '".$table->getPrimeryKey()."' DESC";
-		$query.=";";
-		$dbcon=new maindb_con();
-		$con=$dbcon->get_con();
-		if($result=mysql_query($query,$con))
-		{
-			$num=mysql_num_rows($result);
-			if($num>=1)
+			$query.=" WHERE ";
+			foreach($search as $aKey => $aValue)
 			{
-				while($array=mysql_fetch_array($result))
+				if($count>0)
+					$query.= " AND ";
+				$query.= $aKey." = '".$aValue."'";
+				$count++;
+			}
+		}
+		$query.=" ORDER BY ".$table->getPrimeryKey()." DESC";
+		$query.=";";
+		$dbcon= scDBCon::getInstance();
+		$con=$dbcon->getConnection();
+		if($result=$con->query($query))
+		{
+			if($result->rowCount()>0)
+			{
+				while($row = $result->fetch(PDO::FETCH_ASSOC)) 
 				{
-					$return[]=$array;
+    				$return[]=$row;
 				}
 			}	
 		}
-		//echo'<br /><br />Total records: '.count($return);
-		//foreach($return as $test)
-			//echo $test->getFieldValueByName('connectionid');
-
 		return $return;
 	}
 	
-	public function searchAndUpdateValues($search)
+	public function search($search)
 	{
 		$count=0;
-		$query="SELECT * FROM ".$this->getName()." WHERE ";
-		foreach($search as $aKey => $aValue)
+		$query="SELECT * FROM ".$this->getName();
+		if(count($search)>0)
 		{
-			if($count>0)
-				$query.= " AND ";
-			$query.= $aKey." = '".$aValue."'";
-			$count++;
-		}
-		$query.=" ORDER BY '".$this->getPrimeryKey()."' DESC";
-		$query.=";";
-		//echo $query;
-		$dbcon=new maindb_con();
-		$con=$dbcon->get_con();
-		if($result=mysql_query($query,$con))
-		{
-			$num=mysql_num_rows($result);
-			if($num>=1)
+			$query.=" WHERE ";
+			foreach($search as $aKey => $aValue)
 			{
-				$array=mysql_fetch_array($result);
+				if($count>0)
+					$query.= " AND ";
+				$query.= $aKey." = '".$aValue."'";
+				$count++;
+			}
+		}
+		$query.=" ORDER BY ".$this->getPrimeryKey()." DESC;";
+		//echo $query;
+		$dbcon= scDBCon::getInstance();
+		$con=$dbcon->getConnection();
+		
+		if($result=$con->query($query))
+		{
+			if($result->rowCount()>0)
+			{
+				$row = $result->fetch(PDO::FETCH_ASSOC);
 				foreach($this->records as $aKey => $aValue)
 				{
-					$this->updateRecordByField($aKey,$array[$aKey]);
+					$this->updateRecord($aKey,$row[$aKey]);
 				}
 				return true;
 			}	
 			else
-				$this->addGarbage("$num record found in searchAndUpdateValues()");
+				$this->addGarbage($result->rowCount()." record found in search() for query: ".$query);
 		}
 		else
-			$this->addGarbage("Couldnt run select query on searchAndUpdateValues()");
+			$this->addGarbage("Couldnt run select query on search() ");
 		return false;
 	}
-	public function insertAndUpdateValues()
+	public function insertValues()
 	{
 		$return=false;
 		$query="";
@@ -359,51 +355,22 @@ class table
 			//echo'Primery Key:'.$primeryKey.'. numOfRecords:'.$numOfRecords;
 			if($this->runQuery($this->insert()))
 			{
-				$count=0;
-				$query="SELECT * FROM ".$this->getName()." WHERE ";
+				$search=NULL;
 				foreach($this->records as $aKey => $aValue)
 				{
 					if($aKey!=$primeryKey)
 					{
-						if($count>0)
-							$query.= " AND ";
-						$query.= $aKey." = '".$aValue."'";
-						$count++;
+						$search[$aKey]=$aValue;
 					}
 				}
-				$query.=" ORDER BY '".$this->getPrimeryKey()."' DESC";
-				$query.=";";
-				
-				//echo $query;
-				
-				$dbcon=new maindb_con();
-				$con=$dbcon->get_con();
-				//echo "query on runQuery(): ".$query;
-				if($result=mysql_query($query,$con))
-				{
-					$num=mysql_num_rows($result);
-					if($num>=1)
-					{
-						$array=mysql_fetch_array($result);
-						foreach($this->records as $aKey => $aValue)
-						{
-							//echo NEW_LINE.$aKey.' = '.$array[$aKey];
-							$this->updateRecordByField($aKey,$array[$aKey]);
-						}
-						$return=true;
-					}	
-					else
-						$this->addGarbage("$num record found in insertAndUpdateValues()");
-				}
-				else
-					$this->addGarbage("Couldnt run select query on insertAndUpdateValues()");
+				$return = $this->search($search);
 			}
 			else
 				$this->addGarbage("couldn't insert record ion insertAndUpdateValues()");
 		}
 		else
 			$this->addGarbage("record number is less then 1 in insertAndUpdateValues()");
-		return $return;;
+		return $return;
 	}
 	public function insert()
 	{
@@ -419,19 +386,6 @@ class table
 				if($count>0)
 					$query.= " , ";
 				$query.= $aKey;
-				/*foreach($this->alterIndex as $bKey => $bValue)
-				{
-					if($aKey==$bKey)
-					{
-						foreach($bValue as $fieldProperties)
-						{
-							if($fieldProperties=="PRIMARY KEY")
-								$primeryKey=$aKey;
-							else if($fieldProperties=="UNIQUE KEY")
-								$uniqueKey=$aKey;
-						}	
-					}
-				}*/
 				$count++;
 			}
 			$query.=" ) VALUES (";
@@ -447,18 +401,17 @@ class table
 				$count++;
 			}
 			$query.=" ); ";
-			
 			return $query;
 		}
 		else
 		{
-			$this->addGarbage("no records found to create query in insert()");
+			$this->addGarbage("Error!: no records found to create query in insert()");
 			return false;
 		}
 		
 	}
 
-	public function updateTableWithPrimeryKey($update)
+	public function updateWithPrimeryKey($update)
 	{
 		$primeryKey=$this->getPrimeryKey();
 		$count=0;
@@ -473,12 +426,8 @@ class table
 				$count++;
 			}
 		}
-		$query.=" WHERE ".$primeryKey." = ".$this->getFieldValueByName($primeryKey);
-		
-		$query.=" ; ";
-		echo $query;
+		$query.=" WHERE ".$primeryKey." = ".$this->getFieldValue($primeryKey).";";
 		return $this->runQuery($query);
-			
 	}
 	public function getName()
 	{
@@ -491,10 +440,6 @@ class table
 	private function addGarbage($error)
 	{
 		$this->garbage[]=$error;
-	}
-	public function displayGarbage()
-	{
-		print_r($this->garbage);
 	}
 	public function populateForm($submitScript)
 	{
@@ -592,27 +537,26 @@ class table
 		if(count($search)>0)
 		{
 			if($searchOrNot)
-				return $this->searchAndUpdateValues($search);
+				return $this->search($search);
 		}
 		return $return;
 	}
 	public function __toString()
 	{
-		$return = NEW_LINE."^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^";
-		//$return.= NEW_LINE."===========================================================";
-		$return.= NEW_LINE." ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^".NEW_LINE;
 		
-		$return.= NEW_LINE."@@ tableName: ".$this->getName()." @@".NEW_LINE;
-		$return.= NEW_LINE."@@ Primery Key: ".$this->getPrimeryKey()." @@".NEW_LINE;
-		$return.= NEW_LINE."Query to create table: ".$this->createTableIfNotExists().NEW_LINE;
-		$return.= NEW_LINE."Query to insert table: ".$this->insert().NEW_LINE;
-		$return.= NEW_LINE."Query to turncate table: ".$this->turncateTable().NEW_LINE;
-		$return.= NEW_LINE."Query to drop table: ".$this->dropTable().NEW_LINE;
-		$return.= NEW_LINE."json value: ".$this->valueAsJsonString().NEW_LINE;
+		$return = NEW_LINE.'<table width="95%" style="table-layout:fixed;" cellpadding="5" cellspacing="0" border="1" bordercolor="#DDDDDD" align="center">';
+		$return.= '<tr><th width="200px"> tableName</th> <th> '.$this->getName().'</th></tr>';
+		$return.= '<tr><td> Primery Key</td> <td> '.$this->getPrimeryKey().'</td></tr>';
+		$return.= '<tr><td colspan="2"> Queries</td> </tr> ';
+		$return.= '<tr><td>Create </td> <td> '.$this->createTable().'</td></tr>';
+		$return.= '<tr><td>Insert </td> <td> '.$this->insert().'</td></tr>';
+		$return.= '<tr><td>Turncate </td> <td> '.$this->turncateTable().'</td></tr>';
+		$return.= '<tr><td>Drop </td> <td> '.$this->dropTable().'</td></tr>';
+		$return.= '<tr><td> JSON Value</td> <td> '.$this->valueAsJsonString().'</td></tr>';
 		$count=1;
 		if(count($this->required)>0)
 		{
-			$return.= NEW_LINE."@@ Requested field on form scan: ";
+			$return.= '<tr><td> Requested field on form scan</td> <td> ';
 			foreach($this->required as $req)
 			{
 				if($count>1)
@@ -621,31 +565,31 @@ class table
 					$return.=$req;
 				$count++;
 			}
-			$return.= " @@".NEW_LINE;
+			$return.= '</td></tr>';
 		}
 		$count=1;
 		if(count($this->records)>0)
 		{
-			$return.= NEW_LINE."@@ Record Fields @@";
+			$return.= '<tr><td> Field\'s Values </td> <td> ';
 			foreach($this->records as $key => $value)
-				$return.= NEW_LINE."    ".$count++.". ".$key." = ".$value;
-			$return.= NEW_LINE;
+				$return.= NEW_LINE.$count++.". ".$key." = ".$value;
+			$return.= '</td></tr>';
 		}
 		if(count($this->alterIndex)>0)
 		{
-			$return.= NEW_LINE."@@ Field properties @@";
+			$return.= '<tr><td> Field properties </td> <td> ';
 			$count=1;
 			foreach($this->alterIndex as $key => $value)
 			{
-				$return.= NEW_LINE."    ".$count++.". ".$key;
+				$return.= NEW_LINE.$count++.". ".$key;
 				foreach($value as $anotherValue)
 					$return.= "  ".$anotherValue;
 			}
-			$return.= NEW_LINE;
+			$return.= '</td></tr>';
 		}
 		if(count($this->indexes)>0)
 		{
-			$return.= NEW_LINE."@@ Foreign Key Constraints @@";
+			$return.= '<tr><td> Foreign Key Constraints </td> <td> ';
 			$count=1;
 			foreach($this->indexes as $fKey => $fTable)
 			{
@@ -655,15 +599,15 @@ class table
 		}
 		if(count($this->garbage)>0)
 		{
-			$return.= NEW_LINE."@@  Error/s @@";
+			$return.= '<tr><td>  Error/s </td> <td> ';
 			$count=1;
 			foreach($this->garbage as $key)
-				$return.= NEW_LINE."    ".$count++.". ".$key;
+				$return.= NEW_LINE.$count++.". ".$key;
+			$return.='</td></tr>';
 		}
-		$return.=NEW_LINE."@@ Table Declaration finish @".NEW_LINE.NEW_LINE.NEW_LINE;
-		//$return.= NEW_LINE."##&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&##".NEW_LINE;
+		$return.='<tr><td colspan="2"> Table Declaration finish </td> <tr> ';
+		$return.= '</table>'.NEW_LINE;
 		return $return;
-	}
-	
+	}	
 }
 ?>
